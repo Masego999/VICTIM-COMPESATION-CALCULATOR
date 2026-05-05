@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAF Compensation Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0a1628;
+      --navy-mid: #132040;
+      --navy-light: #1e3058;
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --gold-pale: #f5e9c8;
+      --white: #f8f6f1;
+      --muted: #8a9bb5;
+      --danger: #c94c4c;
+      --success: #4caf7d;
+      --border: rgba(201,168,76,0.2);
+      --font-display: 'DM Serif Display', Georgia, serif;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Background texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 10% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 80%, rgba(30,48,88,0.8) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Grid overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(201,168,76,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201,168,76,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* Header */
+    header { padding: 3rem 0 2.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2.5rem; }
+    .header-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-eyebrow::before {
+      content: '';
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--gold);
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 400;
+      color: var(--white);
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+    }
+    h1 em { color: var(--gold-light); font-style: italic; }
+    .header-sub {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 300;
+      max-width: 520px;
+    }
+    .header-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1.25rem; }
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 10px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* Section layout */
+    .sections { display: flex; flex-direction: column; gap: 1.25rem; }
+    .card {
+      background: rgba(19,32,64,0.6);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.5rem;
+      backdrop-filter: blur(8px);
+    }
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Form elements */
+    .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: 0.02em; }
+    input, select {
+      background: rgba(10,22,40,0.8);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 3px;
+      color: var(--white);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus { border-color: var(--gold); }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c9a84c' fill='none' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+
+    /* Button */
+    .btn-calculate {
+      width: 100%;
+      padding: 14px;
+      background: var(--gold);
+      color: var(--navy);
+      border: none;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 0.5rem;
+    }
+    .btn-calculate:hover { background: var(--gold-light); }
+    .btn-calculate:active { transform: scale(0.99); }
+
+    /* Results */
+    #results { display: none; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1.25rem; }
+    .metric {
+      background: rgba(10,22,40,0.9);
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .metric-label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    .metric-value { font-family: var(--font-display); font-size: 1.7rem; color: var(--gold-light); line-height: 1; }
+    .metric-value.big { font-size: 2.2rem; color: var(--gold); }
+    .metric-sub { font-size: 10px; color: rgba(138,155,181,0.6); margin-top: 2px; }
+
+    /* Bar chart */
+    .bars { display: flex; flex-direction: column; gap: 10px; }
+    .bar-row { display: grid; grid-template-columns: 180px 1fr 130px; align-items: center; gap: 12px; }
+    .bar-label { font-size: 12px; color: var(--muted); }
+    .bar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 1px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 1px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+    .bar-amount { font-family: var(--font-mono); font-size: 12px; color: var(--white); text-align: right; }
+    .bar-divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+
+    /* Formula section */
+    .formula-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .formula-card {
+      background: rgba(10,22,40,0.6);
+      border: 1px solid rgba(201,168,76,0.12);
+      border-radius: 3px;
+      padding: 1rem;
+    }
+    .formula-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .formula-expr { font-family: var(--font-mono); font-size: 12px; color: var(--gold-pale); }
+
+    /* Disclaimer */
+    .disclaimer {
+      border-top: 1px solid var(--border);
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      font-size: 11px;
+      color: rgba(138,155,181,0.5);
+      line-height: 1.7;
+    }
+    .disclaimer strong { color: var(--muted); font-weight: 500; }
+
+    /* Severity badge */
+    .severity-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 2px;
+      letter-spacing: 0.06em;
+      margin-left: 8px;
+    }
+    .sev-minor { background: rgba(76,175,125,0.15); color: #4caf7d; border: 1px solid rgba(76,175,125,0.3); }
+    .sev-moderate { background: rgba(201,168,76,0.15); color: #c9a84c; border: 1px solid rgba(201,168,76,0.3); }
+    .sev-serious { background: rgba(201,120,76,0.15); color: #c9784c; border: 1px solid rgba(201,120,76,0.3); }
+    .sev-catastrophic { background: rgba(201,76,76,0.15); color: #c94c4c; border: 1px solid rgba(201,76,76,0.3); }
+
+    @media (max-width: 600px) {
+      .formula-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 120px 1fr 100px; }
+      .bar-label { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="header-eyebrow">Road Accident Fund Act 56 of 1996</div>
+    <h1>Victim Compensation<br><em>Calculator</em></h1>
+    <p class="header-sub">Actuarial present-value modelling of RAF claims — general damages, loss of earnings, and future medical costs.</p>
+    <div class="header-tags">
+      <span class="tag">RAF Act 56 of 1996</span>
+      <span class="tag">HPCSA impairment scale</span>
+      <span class="tag">Actuarial PV</span>
+      <span class="tag">Contingency deduction</span>
+    </div>
+  </header>
+
+  <div class="sections">
+
+    <!-- Claimant Profile -->
+    <div class="card">
+      <div class="card-title">01 — Claimant profile</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Age at accident</label>
+          <input type="number" id="age" value="32" min="1" max="80">
+        </div>
+        <div class="field">
+          <label>Retirement age</label>
+          <input type="number" id="retire" value="65" min="40" max="75">
+        </div>
+        <div class="field">
+          <label>Gender</label>
+          <select id="gender">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Monthly gross income (R)</label>
+          <input type="number" id="income" value="25000" min="0">
+        </div>
+        <div class="field">
+          <label>Annual income growth (%)</label>
+          <input type="number" id="growth" value="5" min="0" max="15" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <!-- Injury -->
+    <div class="card">
+      <div class="card-title">02 — Injury &amp; impairment</div>
+      <div class="field-grid">
+        <div class="field" style="grid-column: 1/-1">
+          <label>Injury severity</label>
+          <select id="severity" onchange="updateSeverityDefaults()">
+            <option value="minor">Minor — soft tissue, sprains (0–10% WPI)</option>
+            <option value="moderate" selected>Moderate — fractures, whiplash, mild TBI (11–30%)</option>
+            <option value="serious">Serious — amputation, spinal, severe TBI (31–60%)</option>
+            <option value="catastrophic">Catastrophic — paralysis, severe brain injury (61–100%)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Whole-person impairment (%)</label>
+          <input type="number" id="wpi" value="25" min="1" max="100">
+        </div>
+        <div class="field">
+          <label>Earning capacity loss (%)</label>
+          <input type="number" id="ecloss" value="40" min="0" max="100">
+        </div>
+        <div class="field">
+          <label>Past medical costs (R)</label>
+          <input type="number" id="pastmed" value="85000" min="0">
+        </div>
+        <div class="field">
+          <label>Future medical / care costs (R)</label>
+          <input type="number" id="futmed" value="200000" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Actuarial params -->
+    <div class="card">
+      <div class="card-title">03 — Actuarial parameters</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Discount rate (%)</label>
+          <input type="number" id="discount" value="2.5" min="0" max="10" step="0.5">
+        </div>
+        <div class="field">
+          <label>Contingency deduction (%)</label>
+          <input type="number" id="contingency" value="15" min="0" max="40">
+        </div>
+        <div class="field">
+          <label>Life expectancy offset (yrs)</label>
+          <input type="number" id="lifeoffset" value="0" min="-20" max="10">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-calculate" onclick="calculate()">Calculate compensation estimate →</button>
+
+    <!-- Results -->
+    <div id="results">
+
+      <div class="card">
+        <div class="card-title">04 — Summary <span id="sev-badge" class="severity-badge"></span></div>
+
+        <div class="metrics-grid">
+          <div class="metric">
+            <span class="metric-label">General damages</span>
+            <span class="metric-value" id="m-general">—</span>
+            <span class="metric-sub">Pain, suffering &amp; loss of amenity</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Loss of earnings (PV)</span>
+            <span class="metric-value" id="m-earnings">—</span>
+            <span class="metric-sub">Actuarial present value</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Medical costs</span>
+            <span class="metric-value" id="m-medical">—</span>
+            <span class="metric-sub">Past + future (discounted)</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Net award</span>
+            <span class="metric-value big" id="m-net">—</span>
+            <span class="metric-sub">After contingency deduction</span>
+          </div>
+        </div>
+
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <!-- Formulae -->
+      <div class="card" style="margin-top:1.25rem">
+        <div class="card-title">05 — Formulae applied</div>
+        <div class="formula-grid">
+          <div class="formula-card">
+            <div class="formula-name">Present value of earnings loss</div>
+            <div class="formula-expr">PV = Σ [E(t) / (1+r)^t]</div>
+          </div>
+          <div class="formula-card">
+            <div class="formula-name">Income at year t</div>
+            <div class="formula-expr">E(t) = E₀ × (1+g)^t × ec%</div>
+          </div>
+          <div class="formula-card">
+            <div class="formula-name">General damages (HPCSA table)</div>
+            <div class="formula-expr">GD = base(sev) × f(WPI) × f(age)</div>
+          </div>
+          <div class="formula-card">
+            <div class="formula-name">Net award</div>
+            <div class="formula-expr">Award = (GD + PV_E + Med) × (1−c)</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /sections -->
+
+  <div class="disclaimer">
+    <strong>Disclaimer.</strong> This tool is built for educational and portfolio demonstration purposes. Results are indicative estimates based on approximations of the RAF Act 56 of 1996 framework and the HPCSA whole-person impairment scale. This does not constitute legal or financial advice. Actual RAF claims are assessed by qualified actuaries, medical practitioners, and legal professionals. For official claims, consult a registered RAF attorney.
+  </div>
+
+</div><!-- /page -->
+
+<script>
+  function fmt(n) {
+    return 'R\u00a0' + Math.round(n).toLocaleString('en-ZA');
+  }
+
+  function updateSeverityDefaults() {
+    const s = document.getElementById('severity').value;
+    const wpi = document.getElementById('wpi');
+    const ec = document.getElementById('ecloss');
+    if (s === 'minor')       { wpi.value = 8;  ec.value = 10; }
+    if (s === 'moderate')    { wpi.value = 25; ec.value = 40; }
+    if (s === 'serious')     { wpi.value = 50; ec.value = 70; }
+    if (s === 'catastrophic'){ wpi.value = 85; ec.value = 95; }
+  }
+
+  function generalDamages(wpi, age, severity) {
+    const base = { minor: 180000, moderate: 650000, serious: 1800000, catastrophic: 3500000 }[severity];
+    const wpiScale = wpi / 100;
+    let ageFactor = age < 25 ? 1.15 : age < 40 ? 1.05 : age > 55 ? 0.90 : 1.0;
+    return base * wpiScale * ageFactor;
+  }
+
+  function pvEarningsLoss(income12, growthRate, ecLossPct, ageNow, retireAge, discountRate) {
+    const annual = income12 * 12;
+    const ecFrac = ecLossPct / 100;
+    const g = growthRate / 100;
+    const r = discountRate / 100;
+    const years = Math.max(0, retireAge - ageNow);
+    let pv = 0;
+    for (let t = 1; t <= years; t++) {
+      pv += (annual * Math.pow(1 + g, t) * ecFrac) / Math.pow(1 + r, t);
+    }
+    return pv;
+  }
+
+  function pvFutureMed(futMed, ageNow, gender, lifeOffset, discountRate) {
+    const lifeExp = (gender === 'M' ? 67 : 73) + lifeOffset;
+    const years = Math.max(0, lifeExp - ageNow);
+    const r = discountRate / 100;
+    const annualCost = futMed / Math.max(years, 1);
+    let pv = 0;
+    for (let t = 1; t <= years; t++) { pv += annualCost / Math.pow(1 + r, t); }
+    return pv;
+  }
+
+  function setBar(label, value, total, color) {
+    return `<div class="bar-row">
+      <span class="bar-label">${label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.round(value/total*100))}%;background:${color}"></div></div>
+      <span class="bar-amount">${fmt(value)}</span>
+    </div>`;
+  }
+
+  function calculate() {
+    const age        = +document.getElementById('age').value;
+    const retire     = +document.getElementById('retire').value;
+    const income     = +document.getElementById('income').value;
+    const growth     = +document.getElementById('growth').value;
+    const gender     = document.getElementById('gender').value;
+    const severity   = document.getElementById('severity').value;
+    const wpi        = +document.getElementById('wpi').value;
+    const ecloss     = +document.getElementById('ecloss').value;
+    const pastmed    = +document.getElementById('pastmed').value;
+    const futmed     = +document.getElementById('futmed').value;
+    const discount   = +document.getElementById('discount').value;
+    const contingency= +document.getElementById('contingency').value;
+    const lifeoffset = +document.getElementById('lifeoffset').value;
+
+    const gd    = generalDamages(wpi, age, severity);
+    const pve   = pvEarningsLoss(income, growth, ecloss, age, retire, discount);
+    const pvfm  = pvFutureMed(futmed, age, gender, lifeoffset, discount);
+    const total = gd + pve + pastmed + pvfm;
+    const contAmt = total * (contingency / 100);
+    const net   = total - contAmt;
+
+    document.getElementById('m-general').textContent  = fmt(gd);
+    document.getElementById('m-earnings').textContent = fmt(pve);
+    document.getElementById('m-medical').textContent  = fmt(pastmed + pvfm);
+    document.getElementById('m-net').textContent      = fmt(net);
+
+    const sevLabels = { minor:'MINOR', moderate:'MODERATE', serious:'SERIOUS', catastrophic:'CATASTROPHIC' };
+    const sevClasses = { minor:'sev-minor', moderate:'sev-moderate', serious:'sev-serious', catastrophic:'sev-catastrophic' };
+    const badge = document.getElementById('sev-badge');
+    badge.textContent = sevLabels[severity];
+    badge.className = 'severity-badge ' + sevClasses[severity];
+
+    const barsEl = document.getElementById('bars');
+    barsEl.innerHTML = `
+      <hr class="bar-divider">
+      ${setBar('General damages', gd, total, '#c9a84c')}
+      ${setBar('Loss of earnings (PV)', pve, total, '#4caf7d')}
+      ${setBar('Past medical costs', pastmed, total, '#4c8caf')}
+      ${setBar('Future medical costs (PV)', pvfm, total, '#af7d4c')}
+      <hr class="bar-divider">
+      ${setBar('Contingency deduction (−)', contAmt, total, '#c94c4c')}
+      ${setBar('Net award', net, total, '#c9a84c')}
+    `;
+
+    const results = document.getElementById('results');
+    results.style.display = 'block';
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>
